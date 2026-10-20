@@ -1,0 +1,19 @@
+# Secrets
+.env
+.env.local
+**/.env.local
+
+# Dependencies / builds
+node_modules/
+web/dist/
+web/build.log
+
+# Local data
+backups/
+auto-video-gen/output/
+auto-video-gen/.pydeps/
+auto-video-gen/SFX/
+
+# Supabase CLI
+supabase/.temp/
+supabase/.branches/

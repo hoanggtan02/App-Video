@@ -1,0 +1,25 @@
+{
+  "maxAgeHours": 24,
+  "top": 10,
+  "trends": {
+    "url": "https://trends.google.com/trending/rss?geo=VN"
+  },
+  "feeds": [
+    { "name": "VnExpress nổi bật", "url": "https://vnexpress.net/rss/tin-noi-bat.rss", "weight": 1.2 },
+    { "name": "VnExpress mới nhất", "url": "https://vnexpress.net/rss/tin-moi-nhat.rss", "weight": 1.0 },
+    { "name": "VnExpress Số hóa", "url": "https://vnexpress.net/rss/so-hoa.rss", "weight": 1.0 },
+    { "name": "Tuổi Trẻ", "url": "https://tuoitre.vn/rss/tin-moi-nhat.rss", "weight": 1.0 },
+    { "name": "Thanh Niên", "url": "https://thanhnien.vn/rss/home.rss", "weight": 1.0 },
+    { "name": "Dân trí", "url": "https://dantri.com.vn/rss/home.rss", "weight": 1.0 },
+    { "name": "GenK", "url": "https://genk.vn/rss/home.rss", "weight": 1.0 },
+    { "name": "Kenh14", "url": "https://kenh14.vn/rss/home.rss", "weight": 0.9 }
+  ],
+  "preferKeywords": [
+    "AI", "ChatGPT", "Gemini", "Claude", "OpenAI", "Google", "Apple", "iPhone", "Samsung",
+    "TikTok", "Facebook", "công nghệ", "điện thoại", "robot", "xe điện", "VinFast", "smartphone"
+  ],
+  "blockKeywords": [
+    "tử vong", "thi thể", "sát hại", "tự tử", "hiếp dâm", "xâm hại", "khiêu dâm",
+    "xổ số", "xsmn", "xsmb", "kết quả xổ số"
+  ]
+}
