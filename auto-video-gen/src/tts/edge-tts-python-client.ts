@@ -10,6 +10,8 @@ import type { EdgeTtsOpts } from "./edge-tts-client.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 /** Project-local Python deps installed by `npm run tts:setup` */
 const PYDEPS_DIR = join(__dirname, "..", "..", ".pydeps");
+/** Helper that also emits per-word timings (the CLI only writes sentence-level SRT) */
+const WORDS_SCRIPT = join(__dirname, "edge_tts_words.py");
 const TIMEOUT_MS = 60_000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -24,11 +26,11 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export class EdgeTtsPythonClient implements TtsClient {
   constructor(private cfg: EdgeTtsOpts & { python: string }) {}
 
-  async generate(text: string, audioOutPath: string, srtOutPath?: string): Promise<void> {
+  async generate(text: string, audioOutPath: string, srtOutPath?: string, wordsOutPath?: string): Promise<void> {
     const delays = [1000, 2000, 4000];
     for (let attempt = 0; ; attempt++) {
       try {
-        await this.synthesize(text, audioOutPath, srtOutPath);
+        await this.synthesize(text, audioOutPath, srtOutPath, wordsOutPath);
         return;
       } catch (e) {
         if (attempt === delays.length) throw e;
@@ -37,22 +39,27 @@ export class EdgeTtsPythonClient implements TtsClient {
     }
   }
 
-  private async synthesize(text: string, audioOutPath: string, srtOutPath?: string): Promise<void> {
+  private async synthesize(text: string, audioOutPath: string, srtOutPath?: string, wordsOutPath?: string): Promise<void> {
     // Pass text via file to avoid Windows command-line encoding issues with Vietnamese
     const tmp = await mkdtemp(join(tmpdir(), "edge-tts-"));
     const textFile = join(tmp, "text.txt");
     await writeFile(textFile, text, "utf8");
 
-    const args = [
-      "-m", "edge_tts",
-      `--voice=${this.cfg.voice}`,
-      `--rate=${this.cfg.rate ?? "+0%"}`,
-      `--pitch=${this.cfg.pitch ?? "+0Hz"}`,
-      `--volume=${this.cfg.volume ?? "+0%"}`,
-      "--file", textFile,
-      "--write-media", audioOutPath,
-    ];
-    if (srtOutPath) args.push("--write-subtitles", srtOutPath);
+    const rate = this.cfg.rate ?? "+0%";
+    const pitch = this.cfg.pitch ?? "+0Hz";
+    const volume = this.cfg.volume ?? "+0%";
+    const args = wordsOutPath
+      ? [WORDS_SCRIPT, this.cfg.voice, rate, pitch, volume, textFile, audioOutPath, wordsOutPath, ...(srtOutPath ? [srtOutPath] : [])]
+      : [
+          "-m", "edge_tts",
+          `--voice=${this.cfg.voice}`,
+          `--rate=${rate}`,
+          `--pitch=${pitch}`,
+          `--volume=${volume}`,
+          "--file", textFile,
+          "--write-media", audioOutPath,
+          ...(srtOutPath ? ["--write-subtitles", srtOutPath] : []),
+        ];
 
     const env: NodeJS.ProcessEnv = { ...process.env, PYTHONIOENCODING: "utf-8" };
     if (existsSync(PYDEPS_DIR)) {

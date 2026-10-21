@@ -47,7 +47,7 @@ describe("composeHtml", () => {
     expect(html).toContain("Camera 200MP!");            // subhead content
 
     // Image background (hook has bgSrc + bgImageRelPath provided)
-    expect(html).toContain('class="bg kb-zoom-in"');
+    expect(html).toContain('class="bg" data-kb="zoom-in"');
     expect(html).toContain("background-image: url('images/bg.jpg')");
 
     // ── Body templates ─────────────────────────────────────────
@@ -97,5 +97,37 @@ describe("composeHtml", () => {
     // Hook scene with bgSrc but no bgImageRelPath → gradient fallback
     expect(html).toContain('class="bg gradient-news-dark"');
     expect(html).not.toContain("background-image: url");
+  });
+
+  it("adds scene photos and karaoke captions on the absolute timeline", () => {
+    const script = JSON.parse(readFileSync("tests/fixtures/sample-script-with-image.json", "utf8")) as Script;
+    const sceneAudio = script.scenes.map((s) => ({ id: s.id, durationSec: 5 }));
+    const html = composeHtml({
+      script,
+      sceneAudio,
+      gapSec: 0.3,
+      bgImageRelPath: "images/bg.jpg",
+      audioRelPath: "voice.mp3",
+      sceneImages: { "body-1": "images/scene-1.jpg", "body-2": "images/bg.jpg" },
+      captions: {
+        // body-1 starts after hook: 5 + 0.3 = 5.3s
+        "body-1": [{ start: 0.1, end: 0.9, words: [{ text: "Xin", start: 0.1, end: 0.4 }, { text: "chào,", start: 0.4, end: 0.7 }] }],
+        outro: [{ start: 0, end: 1, words: [{ text: "Theo", start: 0, end: 1 }] }],
+      },
+    });
+
+    // body-1 is a stat-hero on a photo → photo layer, wash, legibility panel
+    expect(html).toMatch(/class="scene clip has-photo" id="scene-body-1"/);
+    expect(html).toContain(`class="bg scene-photo" data-kb="zoom-in" style="background-image: url('images/scene-1.jpg')"`);
+    expect(html).toContain(`data-kb="pan-left" style="background-image: url('images/bg.jpg')"`);
+    expect(html).toContain('class="stat-panel"');
+    expect(html).toContain('class="photo-wash"');
+
+    expect(html).toContain('<div class="cap-chunk" data-t0="5.400" data-t1="6.200">');
+    // first word highlighted until the second starts
+    expect(html).toContain('<span class="cap-w" data-t0="5.400" data-t1="5.700"><span class="cap-txt">Xin</span><span class="cap-hl">Xin</span></span>');
+    expect(html).toContain('<span class="cap-txt">chào,</span>');
+    // no captions on the outro (TikTok follow card lives there)
+    expect(html).not.toContain(">Theo</span>");
   });
 });

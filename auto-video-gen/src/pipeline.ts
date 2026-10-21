@@ -6,10 +6,13 @@ import { ScriptSchema, type Script } from "./render/script-schema.js";
 import { loadConfig } from "./config.js";
 import { createTtsClient } from "./tts/tts-client.js";
 import { fetchImage } from "./assets/image-fetcher.js";
-import { getDurationSec, concatWithSilence, mixSfxOntoVoice, type SfxMixSpec } from "./assets/audio-tools.js";
+import { getDurationSec, concatWithSilence, mixSfxOntoVoice, mixBackgroundMusic, type SfxMixSpec } from "./assets/audio-tools.js";
 import { indexSfxLibrary, pickSfxForScene, defaultPlayback } from "./assets/sfx-selector.js";
-import { existsSync } from "node:fs";
-import { composeHtml } from "./render/html-composer.js";
+import { fetchArticleImages } from "./assets/article-images.js";
+import { ensureAudioAssets } from "./assets/synth.js";
+import { existsSync, readdirSync } from "node:fs";
+import { composeHtml, computeTimeline } from "./render/html-composer.js";
+import { loadSceneWords, chunkWords, type CaptionChunk } from "./render/captions.js";
 import { renderWithHyperframes } from "./render/hyperframes-runner.js";
 import { log } from "./utils/logger.js";
 
@@ -27,8 +30,22 @@ const OUTRO_HOLD_SEC = 3;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TPL_DIR = join(__dirname, "render", "templates");
+const ASSETS_DIR = join(__dirname, "..", "assets");
 /** Path to the SFX library (relative to project root) */
-const SFX_DIR = join(__dirname, "..", "assets", "sfx");
+const SFX_DIR = join(ASSETS_DIR, "sfx");
+/** Background music beds: generated gen-*.mp3 plus any royalty-free tracks you add */
+const MUSIC_DIR = join(ASSETS_DIR, "music");
+
+/** Fixed track if configured, otherwise a stable pick per video title. */
+function pickMusic(title: string, fixed?: string): string | null {
+  if (!existsSync(MUSIC_DIR)) return null;
+  const tracks = readdirSync(MUSIC_DIR).filter((f) => f.toLowerCase().endsWith(".mp3")).sort();
+  if (fixed) return tracks.includes(fixed) ? join(MUSIC_DIR, fixed) : null;
+  if (tracks.length === 0) return null;
+  let h = 0;
+  for (const c of title) h = (h * 31 + c.charCodeAt(0)) | 0;
+  return join(MUSIC_DIR, tracks[Math.abs(h) % tracks.length]);
+}
 
 const HYPERFRAMES_CONFIG = {
   $schema: "https://hyperframes.heygen.com/schema/hyperframes.json",
@@ -67,6 +84,10 @@ export async function runPipeline(scriptPath: string): Promise<void> {
   log.step(3, TOTAL_STEPS, "Fetch og:image (parallel) + Step 4 TTS");
   const imgPath = join(outputDir, "images", "bg.jpg");
   const imgPromise = fetchImage(script.metadata.source.image, imgPath);
+  // In-article photos give each body scene its own background
+  const articleImgPromise = fetchArticleImages(script.metadata.source.url, outputDir, {
+    excludeUrls: [script.metadata.source.image],
+  });
 
   // STEP 4
   const ttsClient = createTtsClient(cfg);
@@ -80,6 +101,7 @@ export async function runPipeline(scriptPath: string): Promise<void> {
     limit(async () => {
       const out = join(voiceDir, `scene-${scene.id}.mp3`);
       const srtOut = join(voiceDir, `scene-${scene.id}.srt`);
+      const wordsOut = join(voiceDir, `scene-${scene.id}.words.json`);
 
       // IDEMPOTENT: skip TTS if voice file already exists.
       // To force re-TTS for a scene, delete its mp3 file before running.
@@ -91,15 +113,16 @@ export async function runPipeline(scriptPath: string): Promise<void> {
       }
 
       log.info(`  TTS scene ${scene.id} (${scene.voiceText.length} chars)...`);
-      await ttsClient.generate(scene.voiceText, out, srtOut);
+      await ttsClient.generate(scene.voiceText, out, srtOut, wordsOut);
       const dur = await getDurationSec(out);
       log.info(`  scene ${scene.id}: ${dur.toFixed(2)}s`);
       return { id: scene.id, path: out, durationSec: dur };
     }),
   );
 
-  const [imgResult, sceneAudio] = await Promise.all([
+  const [imgResult, articleImages, sceneAudio] = await Promise.all([
     imgPromise,
+    articleImgPromise,
     Promise.all(sceneAudioPromises),
   ]);
 
@@ -108,6 +131,27 @@ export async function runPipeline(scriptPath: string): Promise<void> {
     bgImageRelPath = "images/bg.jpg";
   } else {
     log.warn(`Background image fetch failed: ${imgResult.reason} → using gradient fallback`);
+  }
+
+  // Body scenes cycle through the article photos (then the og:image); the
+  // composer varies the Ken Burns move per scene so repeats still feel different.
+  const photoPool = [...articleImages, ...(bgImageRelPath ? [bgImageRelPath] : [])];
+  log.info(`  photos: ${articleImages.length} from article${bgImageRelPath ? " + og:image" : ""}`);
+  const sceneImages: Record<string, string> = {};
+  if (photoPool.length > 0) {
+    script.scenes
+      .filter((s) => s.templateData.template !== "hook" && s.templateData.template !== "outro")
+      .forEach((s, i) => { sceneImages[s.id] = photoPool[i % photoPool.length]; });
+  }
+
+  // Karaoke captions from the TTS word timings (estimated if the provider has none)
+  const captions: Record<string, CaptionChunk[]> = {};
+  if (cfg.captionsEnabled) {
+    for (const scene of script.scenes) {
+      const a = sceneAudio.find((x) => x.id === scene.id)!;
+      const words = loadSceneWords(scene.voiceText, a.durationSec, join(voiceDir, `scene-${scene.id}.words.json`));
+      captions[scene.id] = chunkWords(words);
+    }
   }
 
   // STEP 5
@@ -125,6 +169,7 @@ export async function runPipeline(scriptPath: string): Promise<void> {
   }
 
   // Build SFX mix list using smart 3-tier selector
+  await ensureAudioAssets(ASSETS_DIR);
   const sfxIndex = indexSfxLibrary(SFX_DIR);
   const indexCats = Object.keys(sfxIndex).length;
   const indexFiles = Object.values(sfxIndex).reduce((s, a) => s + a.length, 0);
@@ -171,8 +216,21 @@ export async function runPipeline(scriptPath: string): Promise<void> {
       : picked.source;
     log.info(`  scene ${scene.id}: SFX -> ${picked.relPath} (${why})`);
   }
+  const outroHoldSec = OUTRO_HOLD_SEC;
+  const { totalDuration } = computeTimeline(
+    script.scenes, sceneAudio.map((a) => ({ id: a.id, durationSec: a.durationSec })), SCENE_GAP_SEC, outroHoldSec,
+  );
+  const music = cfg.bgmEnabled ? pickMusic(script.metadata.title, cfg.bgmTrack) : null;
   log.info(`  mixing ${sfxList.length} SFX into voice.mp3`);
-  await mixSfxOntoVoice(voiceRawMp3, sfxList, voiceMp3);
+  if (music) {
+    const voiceSfxMp3 = join(outputDir, "voice-sfx.mp3");
+    await mixSfxOntoVoice(voiceRawMp3, sfxList, voiceSfxMp3);
+    log.info(`  background music: ${basename(music)} (volume ${cfg.bgmVolume})`);
+    await mixBackgroundMusic(voiceSfxMp3, music, totalDuration, voiceMp3, cfg.bgmVolume);
+  } else {
+    if (cfg.bgmEnabled) log.warn(`  no background music found in ${MUSIC_DIR}`);
+    await mixSfxOntoVoice(voiceRawMp3, sfxList, voiceMp3);
+  }
 
   const totalAudioSec = await getDurationSec(voiceMp3);
   log.info(`  voice.mp3 total: ${totalAudioSec.toFixed(2)}s`);
@@ -215,7 +273,9 @@ export async function runPipeline(scriptPath: string): Promise<void> {
     audioRelPath: "voice.mp3",
     tiktok: cfg.tiktok,
     tiktokAvatarRelPath: ttAvatarFile,
-    outroHoldSec: OUTRO_HOLD_SEC,
+    outroHoldSec,
+    captions,
+    sceneImages,
   });
 
   // hyperframes expects: index.html (NOT composition.html), hyperframes.json, meta.json in DIR

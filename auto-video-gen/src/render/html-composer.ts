@@ -3,6 +3,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Script, TemplateDataType } from "./script-schema.js";
 import type { TiktokConfig } from "../config.js";
+import type { CaptionChunk } from "./captions.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TPL_DIR = join(__dirname, "templates");
@@ -37,6 +38,32 @@ export interface ComposeArgs {
   tiktokAvatarRelPath?: string;
   /** Extra seconds added to outro scene visual duration after voice ends (TikTok card hold). Default 3. */
   outroHoldSec?: number;
+  /** Karaoke caption chunks per scene id, times relative to the scene start. */
+  captions?: Record<string, CaptionChunk[]>;
+  /** Background photo per scene id (relative path) for body scenes. */
+  sceneImages?: Record<string, string>;
+}
+
+const KB_CYCLE = ["zoom-in", "pan-left", "zoom-out", "pan-right"] as const;
+
+/** Scene start/duration on the composition timeline (shared with the audio mix). */
+export function computeTimeline(
+  scenes: Script["scenes"],
+  sceneAudio: SceneAudio[],
+  gapSec: number,
+  outroHoldSec: number,
+): { timing: { scene: Script["scenes"][number]; start: number; duration: number }[]; totalDuration: number } {
+  let cursor = 0;
+  const timing = scenes.map((scene) => {
+    const audio = sceneAudio.find((a) => a.id === scene.id);
+    if (!audio) throw new Error(`No audio entry for scene id=${scene.id}`);
+    const isOutro = scene.type === "outro";
+    const duration = audio.durationSec + gapSec + (isOutro ? outroHoldSec : 0);
+    const start = cursor;
+    cursor += duration;
+    return { scene, start, duration };
+  });
+  return { timing, totalDuration: cursor };
 }
 
 export function composeHtml(args: ComposeArgs): string {
@@ -47,21 +74,16 @@ export function composeHtml(args: ComposeArgs): string {
 
   // Compute timing per scene. Outro scene gets extra HOLD seconds so the
   // TikTok follow card stays visible after the voice ends.
-  let cursor = 0;
-  const timing = script.scenes.map((scene) => {
-    const audio = sceneAudio.find((a) => a.id === scene.id);
-    if (!audio) throw new Error(`No audio entry for scene id=${scene.id}`);
-    const isOutro = scene.type === "outro";
-    const dur = audio.durationSec + gapSec + (isOutro ? outroHoldSec : 0);
-    const start = cursor;
-    cursor += dur;
-    return { scene, start, duration: dur };
-  });
-  const totalDuration = cursor;
+  const { timing, totalDuration } = computeTimeline(script.scenes, sceneAudio, gapSec, outroHoldSec);
 
   // Render scenes
+  let bodyIdx = 0;
   const sceneHtml = timing.map(({ scene, start, duration }) => {
-    return renderScene(scene, start, duration, bgImageRelPath, tiktok, tiktokAvatar);
+    const td = scene.templateData;
+    const photo = td.template !== "hook" && td.template !== "outro" ? args.sceneImages?.[scene.id] : undefined;
+    const kb = photo ? KB_CYCLE[bodyIdx++ % KB_CYCLE.length] : undefined;
+    const captionHtml = scene.type === "outro" ? "" : renderCaptions(args.captions?.[scene.id] ?? [], start);
+    return renderScene(scene, start, duration, bgImageRelPath, tiktok, tiktokAvatar, photo, kb, captionHtml);
   }).join("\n");
 
   // Persistent shell — uses tiktok handle in footer
@@ -117,6 +139,9 @@ function renderScene(
   bgImageRelPath: string | null,
   tiktok: TiktokConfig,
   tiktokAvatarRelPath: string,
+  photoRelPath?: string,
+  kenBurns?: string,
+  captionHtml = "",
 ): string {
   const td = scene.templateData;
 
@@ -133,7 +158,7 @@ function renderScene(
       layoutName = "comparison";
       break;
     case "stat-hero":
-      inner = renderStatHeroInner(td);
+      inner = renderStatHeroInner(td, Boolean(photoRelPath));
       layoutName = "stat-hero";
       break;
     case "feature-list":
@@ -154,7 +179,30 @@ function renderScene(
     }
   }
 
-  return buildScene(scene, start, duration, layoutName, inner);
+  if (photoRelPath) {
+    inner = `<div class="bg scene-photo" data-kb="${kenBurns ?? "zoom-in"}" style="background-image: url('${escapeHtml(photoRelPath)}')"></div>
+  <div class="photo-wash"></div>
+  ${inner}`;
+  }
+  return buildScene(scene, start, duration, layoutName, inner + captionHtml, photoRelPath ? "has-photo" : "");
+}
+
+// ── KARAOKE CAPTIONS ───────────────────────────────────────────────────────
+// Each word carries a base layer and a highlight layer; animations.js toggles
+// the highlight's opacity while that word is spoken (the timeline can only
+// animate opacity/transform, not color).
+function renderCaptions(chunks: CaptionChunk[], sceneStart: number): string {
+  if (chunks.length === 0) return "";
+  const t = (sec: number) => (sceneStart + sec).toFixed(3);
+  const html = chunks.map((c) => {
+    const words = c.words.map((w, i) => {
+      const hlEnd = i + 1 < c.words.length ? c.words[i + 1].start : c.end;
+      const txt = escapeHtml(w.text);
+      return `<span class="cap-w" data-t0="${t(w.start)}" data-t1="${t(hlEnd)}"><span class="cap-txt">${txt}</span><span class="cap-hl">${txt}</span></span>`;
+    }).join(" ");
+    return `<div class="cap-chunk" data-t0="${t(c.start)}" data-t1="${t(c.end)}">${words}</div>`;
+  }).join("\n    ");
+  return `\n  <div class="captions">\n    ${html}\n  </div>`;
 }
 
 // ── HOOK SCENE ─────────────────────────────────────────────────────────────
@@ -164,8 +212,8 @@ function renderHookInner(td: Extract<TemplateDataType, { template: "hook" }>, bg
   let bgHtml: string;
   if (hasImage) {
     // Ken Burns image
-    const kbClass = td.kenBurns ?? "zoom-in";
-    bgHtml = `<div class="bg kb-${kbClass}" style="background-image: url('${bgImageRelPath}')"></div>`;
+    const kb = td.kenBurns ?? "zoom-in";
+    bgHtml = `<div class="bg" data-kb="${kb}" style="background-image: url('${bgImageRelPath}')"></div>`;
   } else {
     bgHtml = `<div class="bg gradient-news-dark"></div>`;
   }
@@ -207,13 +255,15 @@ function renderComparisonInner(td: Extract<TemplateDataType, { template: "compar
 }
 
 // ── STAT HERO SCENE ────────────────────────────────────────────────────────
-function renderStatHeroInner(td: Extract<TemplateDataType, { template: "stat-hero" }>): string {
+function renderStatHeroInner(td: Extract<TemplateDataType, { template: "stat-hero" }>, onPhoto = false): string {
   const context = td.context ? `<div class="stat-context">${escapeHtml(td.context)}</div>` : "";
+  const body = `<div class="stat-value shimmer-sweep-target">${escapeHtml(td.value)}</div>
+  <div class="stat-label">${escapeHtml(td.label)}</div>
+  ${context}`;
+  // On a photo the bare text needs its own panel to stay legible
   return `
 <div class="layout-stat-hero">
-  <div class="stat-value shimmer-sweep-target">${escapeHtml(td.value)}</div>
-  <div class="stat-label">${escapeHtml(td.label)}</div>
-  ${context}
+  ${onPhoto ? `<div class="stat-panel">${body}</div>` : body}
 </div>`.trim();
 }
 
@@ -298,9 +348,10 @@ function buildScene(
   duration: number,
   layoutName: string,
   innerHtml: string,
+  extraClass = "",
 ): string {
   return `
-<div class="scene clip" id="scene-${scene.id}"
+<div class="scene clip${extraClass ? " " + extraClass : ""}" id="scene-${scene.id}"
      data-start="${start.toFixed(2)}" data-duration="${duration.toFixed(2)}" data-active="0"
      data-layout="${layoutName}">
   ${innerHtml}

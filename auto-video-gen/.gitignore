@@ -14,3 +14,6 @@ SFX/
 .pydeps/
 docs/superpowers
 
+# Generated audio (npm run audio:make — the pipeline also creates it on first render)
+assets/sfx/
+assets/music/gen-*.mp3

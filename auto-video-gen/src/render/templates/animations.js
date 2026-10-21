@@ -32,6 +32,9 @@ window.__timelines["news-video"] = tl;
     tl.set(scene, { opacity: 1 }, start);
     tl.set(scene, { opacity: 0 }, start + dur);
 
+    animateKenBurns(scene, tl, start, dur);
+    animateCaptions(scene, tl);
+
     if (layout === "hook") {
       animateHook(scene, tl, start);
     } else if (layout === "comparison") {
@@ -46,6 +49,46 @@ window.__timelines["news-video"] = tl;
       animateOutro(scene, tl, start, dur);
     }
   });
+
+  // ── KEN BURNS ─────────────────────────────────────────────────────────
+  // Slow zoom/pan on background photos for the whole scene. Driven by the
+  // timeline (not CSS keyframes) so it follows HyperFrames' seeking.
+  const KB = {
+    "zoom-in":   [{ scale: 1.0 },            { scale: 1.18 }],
+    "zoom-out":  [{ scale: 1.18 },           { scale: 1.0 }],
+    "pan-left":  [{ scale: 1.15, x: 45 },    { scale: 1.15, x: -45 }],
+    "pan-right": [{ scale: 1.15, x: -45 },   { scale: 1.15, x: 45 }],
+  };
+  function animateKenBurns(scene, tl, start, dur) {
+    scene.querySelectorAll(".bg[data-kb]").forEach((bg) => {
+      const kb = KB[bg.dataset.kb] || KB["zoom-in"];
+      tl.fromTo(bg, kb[0], Object.assign({ duration: dur, ease: "none" }, kb[1]), start);
+    });
+  }
+
+  // ── KARAOKE CAPTIONS ──────────────────────────────────────────────────
+  // Chunk of 2–4 words pops in; the word being spoken switches to its
+  // highlight layer and gets a small bounce.
+  function animateCaptions(scene, tl) {
+    scene.querySelectorAll(".cap-chunk").forEach((chunk) => {
+      const t0 = parseFloat(chunk.dataset.t0);
+      const t1 = parseFloat(chunk.dataset.t1);
+      tl.set(chunk, { opacity: 1 }, t0);
+      tl.fromTo(chunk, { scale: 0.86, y: 24 }, { scale: 1, y: 0, duration: 0.16 }, t0);
+      tl.set(chunk, { opacity: 0 }, t1);
+
+      chunk.querySelectorAll(".cap-w").forEach((w) => {
+        const w0 = parseFloat(w.dataset.t0);
+        const w1 = parseFloat(w.dataset.t1);
+        const hl = w.querySelector(".cap-hl");
+        tl.set(hl, { opacity: 1 }, w0);
+        tl.set(hl, { opacity: 0 }, w1);
+        // to() pair (not fromTo) so words not yet spoken stay at scale 1
+        tl.to(w, { scale: 1.16, duration: 0.06 }, w0);
+        tl.to(w, { scale: 1, duration: 0.14 }, w0 + 0.06);
+      });
+    });
+  }
 
   // ── HOOK ──────────────────────────────────────────────────────────────
   function animateHook(scene, tl, start) {

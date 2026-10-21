@@ -605,3 +605,49 @@ html, body {
 
 .tt-check-icon { display: inline-block; width: 22px; height: 22px; }
 .tt-check-icon svg { width: 22px; height: 22px; display: block; }
+
+/* ── KARAOKE CAPTIONS ────────────────────────────────────────────
+   Big outlined words between the content and the footer pills; the word
+   being spoken switches to the yellow highlight layer (animations.js).
+   Side clearance keeps text off TikTok's right-hand icon rail. */
+.captions {
+  position: absolute; left: 0; right: 0; top: 1290px; height: 320px;
+  z-index: 60; pointer-events: none;
+}
+.cap-chunk {
+  position: absolute; left: 130px; right: 130px; top: 0; bottom: 0;
+  display: flex; flex-wrap: wrap; align-content: center; justify-content: center;
+  gap: 0 22px; text-align: center; opacity: 0;
+}
+.cap-w {
+  position: relative; display: inline-block;
+  font-family: 'Inter', sans-serif; font-size: 80px; font-weight: 900;
+  line-height: 1.12; letter-spacing: -0.01em;
+}
+.cap-txt, .cap-hl {
+  -webkit-text-stroke: 12px #0b0b12; paint-order: stroke fill;
+}
+.cap-txt { color: #ffffff; text-shadow: 0 10px 22px rgba(0,0,0,0.45); }
+.cap-hl  { position: absolute; left: 0; top: 0; color: #ffe11a; opacity: 0; }
+
+/* Content moves up to leave the lower third for captions */
+.scene .layout-hook, .scene .layout-comparison, .scene .layout-stat-hero,
+.scene .layout-feature-list, .scene .layout-callout { padding-bottom: 660px; }
+
+/* ── SCENE PHOTOS ────────────────────────────────────────────────
+   Body scenes show an article photo (Ken Burns via animations.js) under a
+   wash in the theme's background color: strong at the top (brand header)
+   and bottom (captions), lighter in the middle where the cards sit. */
+.photo-wash { position: absolute; inset: 0; z-index: 3; }
+.photo-wash {
+  background: linear-gradient(180deg,
+    rgba(248,250,252,0.80) 0%, rgba(248,250,252,0.10) 16%,
+    rgba(248,250,252,0.18) 45%, rgba(248,250,252,0.55) 68%, rgba(248,250,252,0.90) 100%);
+}
+.stat-panel {
+  display: flex; flex-direction: column; align-items: center; gap: 24px;
+  background: rgba(255,255,255,0.93);
+  border: 2px solid rgba(37,99,235,0.16);
+  border-radius: 40px; padding: 56px 64px;
+  box-shadow: 0 32px 70px rgba(15,23,42,0.18);
+}

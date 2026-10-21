@@ -201,3 +201,37 @@ export async function mixSfxOntoVoice(
 
   await run("ffmpeg", ffArgs);
 }
+
+/**
+ * Lay a looping background track under the voice (+SFX) mix.
+ *
+ * - Music loops to `totalSec` (the full video incl. the outro hold), fades in
+ *   and out, and is ducked by a sidechain compressor keyed on the voice so the
+ *   narration always sits on top.
+ * - Output is stereo mp3, exactly `totalSec` long.
+ */
+export async function mixBackgroundMusic(
+  voicePath: string,
+  musicPath: string,
+  totalSec: number,
+  outPath: string,
+  musicVolume = 0.2,
+): Promise<void> {
+  const T = totalSec.toFixed(3);
+  const fadeOutAt = Math.max(0, totalSec - 2).toFixed(3);
+  const filter = [
+    `[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,apad=whole_dur=${T},asplit=2[voice][key]`,
+    `[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,atrim=0:${T},asetpts=N/SR/TB,` +
+      `volume=${musicVolume},afade=t=in:st=0:d=0.8,afade=t=out:st=${fadeOutAt}:d=2[music]`,
+    `[music][key]sidechaincompress=threshold=0.015:ratio=6:attack=20:release=400[ducked]`,
+    `[voice][ducked]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.95[out]`,
+  ].join(";");
+  await run("ffmpeg", [
+    "-y", "-i", voicePath,
+    "-stream_loop", "-1", "-i", musicPath,
+    "-filter_complex", filter,
+    "-map", "[out]", "-t", T,
+    "-c:a", "libmp3lame", "-b:a", "192k", "-ar", "44100",
+    outPath,
+  ]);
+}

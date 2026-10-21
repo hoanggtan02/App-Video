@@ -9,8 +9,10 @@ export interface TtsClient {
    * Generate speech audio for `text` and write to `audioOutPath` (mp3 or wav).
    * If `srtOutPath` is provided AND the provider supports subtitles,
    * write the SRT to that path. Otherwise silently skip.
+   * If `wordsOutPath` is provided AND the provider supports word timings,
+   * write a JSON array of { text, start, end } (seconds) used for karaoke captions.
    */
-  generate(text: string, audioOutPath: string, srtOutPath?: string): Promise<void>;
+  generate(text: string, audioOutPath: string, srtOutPath?: string, wordsOutPath?: string): Promise<void>;
 }
 
 import type { Config } from "../config.js";

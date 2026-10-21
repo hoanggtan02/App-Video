@@ -52,6 +52,15 @@ export interface Config {
 
   /** Visual template — selects which styles.<theme>.css file gets used. */
   videoTheme: VideoTheme;
+
+  /** Background music under the voice (assets/music/*.mp3). */
+  bgmEnabled: boolean;
+  /** 0–1, before ducking. */
+  bgmVolume: number;
+  /** Fixed track file name in assets/music; empty = pick one per video. */
+  bgmTrack?: string;
+  /** Karaoke captions burned into the video. */
+  captionsEnabled: boolean;
 }
 
 function intDefault(name: string, def: number): number {
@@ -164,5 +173,9 @@ export function loadConfig(): Config {
     },
     ttsConcurrency: intDefault("TTS_CONCURRENCY", 1),
     videoTheme,
+    bgmEnabled: process.env.BGM_ENABLED !== "false",
+    bgmVolume: floatDefault("BGM_VOLUME", 0.2),
+    bgmTrack: process.env.BGM_TRACK || undefined,
+    captionsEnabled: process.env.CAPTIONS_ENABLED !== "false",
   };
 }
