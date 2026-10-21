@@ -625,3 +625,4 @@ html, body {
   border-radius: 40px; padding: 56px 64px;
   box-shadow: 0 32px 70px rgba(0,0,0,0.45);
 }
+.stat-panel .stat-value { font-size: 150px; }

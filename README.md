@@ -102,6 +102,15 @@ Có thể chạy tay bất cứ lúc nào khi thấy video "Chờ kịch bản".
 | `npm run cowork -- pending` | Xem video chờ kịch bản |
 | `npm run news:find` | Thử tìm tin hot (in ra màn hình, không ghi DB) |
 | `npm test` | Chạy test |
+| `npm run audio:make` | Tạo lại nhạc nền + hiệu ứng âm thanh (tự tạo khi render lần đầu) |
+
+### Phụ đề, ảnh, nhạc nền
+
+- **Phụ đề karaoke** chạy theo giọng đọc, chữ đang đọc tô vàng. Tắt: `CAPTIONS_ENABLED=false` trong `.env.local`.
+- **Ảnh cho mọi cảnh**: worker lấy thêm ảnh trong bài báo gốc; bài ít ảnh thì dùng lại ảnh với kiểu zoom/lia khác nhau.
+- **Nhạc nền + SFX** được tổng hợp sẵn (không lo bản quyền), nhạc tự nhỏ lại khi có giọng đọc.
+  Muốn dùng nhạc riêng: chép file mp3 miễn phí bản quyền (vd. YouTube Audio Library) vào `auto-video-gen/assets/music/`.
+  Chỉnh âm lượng: `BGM_VOLUME=0.2`; cố định 1 bài: `BGM_TRACK=ten-file.mp3`; tắt: `BGM_ENABLED=false`.
 
 ## Gặp lỗi
 

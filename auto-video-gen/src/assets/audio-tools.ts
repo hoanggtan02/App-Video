@@ -220,7 +220,8 @@ export async function mixBackgroundMusic(
   const T = totalSec.toFixed(3);
   const fadeOutAt = Math.max(0, totalSec - 2).toFixed(3);
   const filter = [
-    `[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,apad=whole_dur=${T},asplit=2[voice][key]`,
+    // pan (not aformat) for mono→stereo: the default upmix drops the voice by 3 dB
+    `[0:a]aresample=44100,pan=stereo|c0=c0|c1=c0,apad=whole_dur=${T},asplit=2[voice][key]`,
     `[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,atrim=0:${T},asetpts=N/SR/TB,` +
       `volume=${musicVolume},afade=t=in:st=0:d=0.8,afade=t=out:st=${fadeOutAt}:d=2[music]`,
     `[music][key]sidechaincompress=threshold=0.015:ratio=6:attack=20:release=400[ducked]`,

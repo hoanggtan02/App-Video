@@ -5,6 +5,7 @@
 import axios from "axios";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
+import { rm } from "node:fs/promises";
 import { fetchImage } from "./image-fetcher.js";
 
 const SKIP = /(logo|icon|avatar|banner|sprite|emoji|tracking|pixel|placeholder|ads?[\/_-]|qrcode|button)/i;
@@ -86,7 +87,10 @@ export async function fetchArticleImages(
     const abs = join(outputDir, rel);
     const r = await fetchImage(url, abs);
     if (!r.success) continue;
-    if ((await imageWidth(abs)) < MIN_WIDTH) continue; // thumbnails, inline icons
+    if ((await imageWidth(abs)) < MIN_WIDTH) {
+      await rm(abs, { force: true }); // thumbnails, inline icons
+      continue;
+    }
     saved.push(rel);
   }
   return saved;

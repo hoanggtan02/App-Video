@@ -20,7 +20,7 @@
     "cowork": "tsx src/worker/cowork.ts",
     "news:find": "tsx src/news/find-news.ts",
     "news:used": "tsx src/news/find-news.ts used",
-    "tts:setup": "python -m pip install --upgrade --target .pydeps edge-tts>=7.3.1",
+    "tts:setup": "python -m pip install --upgrade --target .pydeps \"edge-tts>=7.3.1\"",
     "audio:make": "tsx src/assets/synth.ts"
   },
   "keywords": [

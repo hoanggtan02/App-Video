@@ -53,13 +53,14 @@ window.__timelines["news-video"] = tl;
   // ── KEN BURNS ─────────────────────────────────────────────────────────
   // Slow zoom/pan on background photos for the whole scene. Driven by the
   // timeline (not CSS keyframes) so it follows HyperFrames' seeking.
-  const KB = {
-    "zoom-in":   [{ scale: 1.0 },            { scale: 1.18 }],
-    "zoom-out":  [{ scale: 1.18 },           { scale: 1.0 }],
-    "pan-left":  [{ scale: 1.15, x: 45 },    { scale: 1.15, x: -45 }],
-    "pan-right": [{ scale: 1.15, x: -45 },   { scale: 1.15, x: 45 }],
-  };
   function animateKenBurns(scene, tl, start, dur) {
+    // (inside the function: scenes are dispatched above, before a top-level const would exist)
+    const KB = {
+      "zoom-in":   [{ scale: 1.0 },            { scale: 1.18 }],
+      "zoom-out":  [{ scale: 1.18 },           { scale: 1.0 }],
+      "pan-left":  [{ scale: 1.15, x: 45 },    { scale: 1.15, x: -45 }],
+      "pan-right": [{ scale: 1.15, x: -45 },   { scale: 1.15, x: 45 }],
+    };
     scene.querySelectorAll(".bg[data-kb]").forEach((bg) => {
       const kb = KB[bg.dataset.kb] || KB["zoom-in"];
       tl.fromTo(bg, kb[0], Object.assign({ duration: dur, ease: "none" }, kb[1]), start);

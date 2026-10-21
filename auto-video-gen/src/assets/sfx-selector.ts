@@ -72,7 +72,7 @@ export const KEYWORD_RULES: { pattern: RegExp; category: string; label: string }
   },
   // Failure / mistake / error
   {
-    pattern: /(thất bại|sai lầm|sụp đổ|lỗi nghiêm trọng|không đạt|trượt|fail|error|wrong|mistake|crash|broken)/i,
+    pattern: /(thất bại|sai lầm|sụp đổ|lỗi nghiêm trọng|không đạt|fail|error|wrong|mistake|crash|broken)/i,
     category: "fail",
     label: "failure",
   },
