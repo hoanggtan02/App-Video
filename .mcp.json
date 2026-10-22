@@ -3,6 +3,13 @@
     "supabase": {
       "type": "http",
       "url": "https://mcp.supabase.com/mcp?project_ref=fpeffhealhrbgzdeaoak&features=docs%2Caccount%2Cdatabase%2Cdebugging%2Cdevelopment%2Cfunctions%2Cbranching"
+    },
+    "concat": {
+      "command": "C:\\Users\\USER\\AppData\\Local\\Programs\\Concat\\concat.exe",
+      "args": ["--mcp"],
+      "env": {
+        "CONCAT_MCP_ROOTS": "C:\\Users\\USER;C:\\xampp\\htdocs\\Tan\\Video"
+      }
     }
   }
 }
