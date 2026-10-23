@@ -1,4 +1,4 @@
-import type { JobType, VideoStatus } from "./types";
+import type { JobType, VideoKind, VideoStatus } from "./types";
 
 export function timeAgo(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -29,6 +29,34 @@ export const VIDEO_STATUS: Record<VideoStatus, { label: string; tone: "muted" | 
   rejected: { label: "Từ chối", tone: "muted" },
   failed: { label: "Lỗi", tone: "bad" },
 };
+
+/** Premium films are made by Cowork, so the early steps read differently. */
+export function videoStatus(v: { status: VideoStatus; kind?: VideoKind }) {
+  if (v.kind === "premium") {
+    if (v.status === "waiting_script") return { label: "Chờ dựng phim", tone: "muted" as const };
+    if (v.status === "rendering") return { label: "Đang dựng phim", tone: "info" as const };
+  }
+  return VIDEO_STATUS[v.status];
+}
+
+/**
+ * lemo-opuscar styles that suit a news short. Cowork looks the name up in the library's
+ * styles/README.md; any other style name from the library works too.
+ */
+export const FILM_STYLES = [
+  "Caption News",
+  "Broadcast News Package",
+  "Data Storytelling",
+  "Whiteboard Explainer",
+  "Isometric Infographic",
+  "Dark Tech Keynote",
+  "Sci-fi Hologram HUD",
+  "Halftone Dossier",
+  "Swiss Motion Graphics",
+  "Visual Investigation",
+  "Exploded Teardown",
+  "Watercolor Brush",
+];
 
 export const JOB_LABEL: Record<JobType, string> = {
   find_news: "Tìm tin",

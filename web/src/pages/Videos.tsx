@@ -4,10 +4,10 @@ import { supabase, must } from "../lib/supabase";
 import { useChannel } from "../lib/channel";
 import { useLive, useAction } from "../lib/hooks";
 import {
-  approveVideo, deleteVideo, postVideo, previewUrl, rejectVideo, rerenderVideo, rewriteScript, saveCaption,
+  approveVideo, deleteVideo, makePremiumFilm, postVideo, previewUrl, rejectVideo, rerenderVideo, rewriteScript, saveCaption,
 } from "../lib/actions";
-import { timeAgo, VIDEO_STATUS } from "../lib/format";
-import { Badge, Empty, Notice, PageHeader } from "../components/ui";
+import { timeAgo, videoStatus } from "../lib/format";
+import { Badge, Empty, FilmButton, Notice, PageHeader } from "../components/ui";
 import type { Channel, Video, VideoStatus } from "../lib/types";
 
 const TABS: { key: string; label: string; statuses: VideoStatus[] }[] = [
@@ -54,7 +54,9 @@ function VideoCard({ video, channel }: { video: Video; channel: Channel }) {
   const [tags, setTags] = useState(video.hashtags.map((t) => `#${t}`).join(" "));
   const [showScript, setShowScript] = useState(false);
   const action = useAction();
-  const st = VIDEO_STATUS[video.status];
+  const st = videoStatus(video);
+  const premium = video.kind === "premium";
+  const canRerender = premium ? !!video.local_dir : !!video.script;
 
   useEffect(() => {
     setCaption(video.caption ?? "");
@@ -80,7 +82,10 @@ function VideoCard({ video, channel }: { video: Video; channel: Channel }) {
       </div>
       <div className="video-info">
         <div className="row between wrap gap">
-          <Badge tone={st.tone}>{st.label}</Badge>
+          <span className="row gap">
+            <Badge tone={st.tone}>{st.label}</Badge>
+            {premium && <Badge tone="warn">★ Phim cao cấp{video.film_style ? ` · ${video.film_style}` : ""}</Badge>}
+          </span>
           <span className="muted small">
             {video.duration_sec ? `${Math.round(video.duration_sec)}s · ` : ""}{timeAgo(video.updated_at)}
           </span>
@@ -123,16 +128,21 @@ function VideoCard({ video, channel }: { video: Video; channel: Channel }) {
               Đăng lên TikTok
             </button>
           )}
-          {["review", "failed", "rejected", "posted"].includes(video.status) && video.script && (
+          {["review", "failed", "rejected", "posted"].includes(video.status) && canRerender && (
             <button className="btn btn-ghost btn-sm" disabled={action.busy} onClick={() => action.run(() => rerenderVideo(video), "Đã xếp hàng render lại")}>
               Render lại
             </button>
           )}
           {["review", "failed", "rejected"].includes(video.status) && (
             <button className="btn btn-ghost btn-sm" disabled={action.busy}
-              onClick={() => action.run(() => rewriteScript(video), "Đã gửi lại cho Cowork viết kịch bản mới")}>
-              Viết lại kịch bản
+              onClick={() => action.run(() => rewriteScript(video),
+                premium ? "Đã gửi lại cho Cowork dựng phim mới" : "Đã gửi lại cho Cowork viết kịch bản mới")}>
+              {premium ? "Dựng lại phim" : "Viết lại kịch bản"}
             </button>
+          )}
+          {!premium && ["waiting_script", "review", "failed", "rejected"].includes(video.status) && (
+            <FilmButton label="Làm thành phim cao cấp" disabled={action.busy}
+              onConfirm={(film) => action.run(() => makePremiumFilm(video, film), "Đã chuyển — Cowork sẽ dựng phim cao cấp")} />
           )}
           {video.script && (
             <button className="btn btn-ghost btn-sm" onClick={() => setShowScript((s) => !s)}>{showScript ? "Ẩn kịch bản" : "Xem kịch bản"}</button>

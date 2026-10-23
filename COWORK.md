@@ -2,6 +2,8 @@
 
 Bạn (Cowork) chỉ làm **một việc**: viết kịch bản cho các video đang chờ. Việc tìm tin, render và đăng TikTok do worker lo.
 
+(Video ★ Phim cao cấp không nằm trong danh sách này — chúng thuộc tác vụ riêng, xem `COWORK-FILM.md`.)
+
 Mọi lệnh chạy trong thư mục `auto-video-gen/`.
 
 ## Bước 1 — Lấy danh sách video chờ kịch bản

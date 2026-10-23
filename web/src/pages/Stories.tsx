@@ -4,7 +4,7 @@ import { useChannel } from "../lib/channel";
 import { useLive, useAction } from "../lib/hooks";
 import { createVideoFromStory, createVideoFromUrl, enqueue, skipStory } from "../lib/actions";
 import { timeAgo } from "../lib/format";
-import { Badge, Empty, Notice, PageHeader } from "../components/ui";
+import { Badge, Empty, FilmButton, FilmStyleSelect, Notice, PageHeader } from "../components/ui";
 import type { Story, StoryStatus } from "../lib/types";
 
 const TABS: { key: StoryStatus | "all"; label: string }[] = [
@@ -18,6 +18,8 @@ export function Stories() {
   const { channel } = useChannel();
   const [tab, setTab] = useState<StoryStatus | "all">("new");
   const [url, setUrl] = useState("");
+  const [premium, setPremium] = useState(false);
+  const [filmStyle, setFilmStyle] = useState("");
   const action = useAction();
 
   const { data: stories } = useLive(
@@ -33,9 +35,9 @@ export function Stories() {
   function addUrl(e: FormEvent) {
     e.preventDefault();
     action.run(async () => {
-      await createVideoFromUrl(channel!.id, url.trim());
+      await createVideoFromUrl(channel!.id, url.trim(), premium ? { style: filmStyle || null } : undefined);
       setUrl("");
-    }, "Đã thêm — Cowork sẽ viết kịch bản ở lần chạy tới");
+    }, premium ? "Đã thêm — Cowork sẽ dựng phim cao cấp ở lần chạy tác vụ phim" : "Đã thêm — Cowork sẽ viết kịch bản ở lần chạy tới");
   }
 
   return (
@@ -54,6 +56,11 @@ export function Stories() {
 
       <form className="card row gap wrap" onSubmit={addUrl}>
         <input className="grow" type="url" placeholder="Dán link bài báo bất kỳ để làm video…" value={url} onChange={(e) => setUrl(e.target.value)} required />
+        <label className="check">
+          <input type="checkbox" checked={premium} onChange={(e) => setPremium(e.target.checked)} />
+          <span>★ Phim cao cấp</span>
+        </label>
+        {premium && <FilmStyleSelect value={filmStyle} onChange={setFilmStyle} />}
         <button className="btn" disabled={action.busy}>Làm video từ link</button>
       </form>
 
@@ -81,11 +88,13 @@ export function Stories() {
                 <ul>{s.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
               </details>
               {s.status === "new" && (
-                <div className="row gap">
+                <div className="row gap wrap">
                   <button className="btn btn-primary btn-sm" disabled={action.busy}
                     onClick={() => action.run(() => createVideoFromStory(s), "Đã chọn — Cowork sẽ viết kịch bản")}>
                     Tạo video
                   </button>
+                  <FilmButton disabled={action.busy}
+                    onConfirm={(film) => action.run(() => createVideoFromStory(s, film), "Đã chọn — Cowork sẽ dựng phim cao cấp")} />
                   <button className="btn btn-ghost btn-sm" disabled={action.busy} onClick={() => action.run(() => skipStory(s))}>
                     Bỏ qua
                   </button>

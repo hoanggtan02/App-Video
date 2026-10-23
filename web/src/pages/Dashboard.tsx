@@ -3,7 +3,7 @@ import { supabase, must } from "../lib/supabase";
 import { useChannel } from "../lib/channel";
 import { useLive, useAction } from "../lib/hooks";
 import { enqueue } from "../lib/actions";
-import { JOB_LABEL, JOB_STATUS, timeAgo, VIDEO_STATUS } from "../lib/format";
+import { JOB_LABEL, JOB_STATUS, timeAgo, videoStatus } from "../lib/format";
 import { Badge, Notice, PageHeader, Stat, Empty } from "../components/ui";
 import type { Heartbeat, Job, Video } from "../lib/types";
 
@@ -17,12 +17,12 @@ export function Dashboard() {
     async () => {
       const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
       const [videos, jobs, hb] = await Promise.all([
-        supabase.from("videos").select("id,title,status,created_at").eq("channel_id", channel!.id).gte("created_at", since),
+        supabase.from("videos").select("id,title,status,kind,created_at").eq("channel_id", channel!.id).gte("created_at", since),
         supabase.from("jobs").select("*").or(`channel_id.eq.${channel!.id},channel_id.is.null`).order("created_at", { ascending: false }).limit(12),
         supabase.from("worker_heartbeat").select("*").order("last_seen", { ascending: false }).limit(1),
       ]);
       return {
-        videos: must(videos) as Pick<Video, "id" | "title" | "status" | "created_at">[],
+        videos: must(videos) as Pick<Video, "id" | "title" | "status" | "kind" | "created_at">[],
         jobs: must(jobs) as Job[],
         worker: (must(hb) as Heartbeat[])[0] ?? null,
       };
@@ -98,8 +98,8 @@ export function Dashboard() {
           <ul className="list">
             {[...videos].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 8).map((v) => (
               <li key={v.id} className="row between">
-                <span className="ellipsis">{v.title}</span>
-                <Badge tone={VIDEO_STATUS[v.status].tone}>{VIDEO_STATUS[v.status].label}</Badge>
+                <span className="ellipsis">{v.kind === "premium" ? "★ " : ""}{v.title}</span>
+                <Badge tone={videoStatus(v).tone}>{videoStatus(v).label}</Badge>
               </li>
             ))}
           </ul>

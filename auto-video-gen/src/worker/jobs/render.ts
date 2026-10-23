@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, writeFile, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { ENGINE_DIR } from "../config.js";
-import { getChannel, getVideo, resolveSettings, must, enqueue, type Job } from "../db.js";
+import { getChannel, getVideo, resolveSettings, must, enqueue, type Job, type Channel, type ChannelSettings, type Video } from "../db.js";
 import { getDurationSec } from "../../assets/audio-tools.js";
 import { toSlug } from "../../utils/slug.js";
 import { log } from "../../utils/logger.js";
@@ -28,13 +29,28 @@ function stamp(d = new Date()): string {
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
 }
 
+/** output/<channel>/<stamp>-<title>/ — one folder per render (raw video.mp4 + final.mp4) */
+export function newVideoDir(channelName: string, title: string): string {
+  return join(ENGINE_DIR, "output", toSlug(channelName), `${stamp()}-${toSlug(title)}`);
+}
+
 /** payload: { videoId } */
 export async function runRender(db: SupabaseClient, job: Job) {
   const video = await getVideo(db, job.payload.videoId);
-  if (!video.script) throw new Error("Video chưa có kịch bản");
   const channel = await getChannel(db, video.channel_id);
   const s = resolveSettings(channel.settings);
 
+  if (video.kind === "premium") {
+    // Cowork already made the film (npm run cowork -- film-submit); only compress + publish the preview
+    if (!video.local_dir || !existsSync(join(video.local_dir, "video.mp4"))) {
+      throw new Error("Chưa có file phim — Cowork cần nộp bằng npm run cowork -- film-submit");
+    }
+    must(await db.from("videos").update({ status: "rendering", error: null }).eq("id", video.id), "mark rendering");
+    log.info(`  finalize premium film ${video.title} → ${video.local_dir}`);
+    return finalize(db, video, channel, s, video.local_dir);
+  }
+
+  if (!video.script) throw new Error("Video chưa có kịch bản");
   must(await db.from("videos").update({ status: "rendering", error: null }).eq("id", video.id), "mark rendering");
 
   // Channel identity always wins over whatever the script author wrote
@@ -45,7 +61,7 @@ export async function runRender(db: SupabaseClient, job: Job) {
     if (scene.templateData?.template === "outro") scene.templateData.channelName = channel.name.slice(0, 30);
   }
 
-  const dir = join(ENGINE_DIR, "output", toSlug(channel.name), `${stamp()}-${toSlug(video.title)}`);
+  const dir = newVideoDir(channel.name, video.title);
   await mkdir(dir, { recursive: true });
   const scriptPath = join(dir, "script.json");
   await writeFile(scriptPath, JSON.stringify(script, null, 2));
@@ -67,6 +83,11 @@ export async function runRender(db: SupabaseClient, job: Job) {
     },
   });
 
+  return finalize(db, video, channel, s, dir);
+}
+
+/** <dir>/video.mp4 → compressed final.mp4, preview upload, status review (or approved + post when autoPost). */
+async function finalize(db: SupabaseClient, video: Video, channel: Channel, s: ChannelSettings, dir: string) {
   // Re-encode: the raw render is ~100 MB; TikTok re-compresses anyway
   const finalPath = join(dir, "final.mp4");
   await run("ffmpeg", [

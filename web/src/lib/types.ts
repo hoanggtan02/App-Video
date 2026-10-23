@@ -53,6 +53,8 @@ export type VideoStatus =
   | "waiting_script" | "script_ready" | "rendering" | "review" | "approved"
   | "posting" | "posted" | "rejected" | "failed";
 
+export type VideoKind = "standard" | "premium";
+
 export interface Video {
   id: string;
   channel_id: string;
@@ -60,6 +62,11 @@ export interface Video {
   source_url: string | null;
   title: string;
   status: VideoStatus;
+  /** standard = template render; premium = film made by Cowork with lemo-opuscar */
+  kind: VideoKind;
+  /** lemo-opuscar style name; null = Cowork picks */
+  film_style: string | null;
+  local_dir: string | null;
   script: any;
   caption: string | null;
   hashtags: string[];

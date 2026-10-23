@@ -52,6 +52,10 @@ export interface Video {
   source_url: string | null;
   title: string;
   status: string;
+  /** standard = template render; premium = film made by Cowork with lemo-opuscar */
+  kind: "standard" | "premium";
+  /** lemo-opuscar style name; null = Cowork picks */
+  film_style: string | null;
   script: any;
   caption: string | null;
   hashtags: string[];

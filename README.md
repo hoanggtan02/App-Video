@@ -91,6 +91,25 @@ Trong Cowork tạo **tác vụ định kỳ** mỗi ngày lúc **07:15** (sau gi
 
 Có thể chạy tay bất cứ lúc nào khi thấy video "Chờ kịch bản".
 
+### 6. Phim cao cấp (tùy chọn)
+
+Bên cạnh video template, có thể cho Cowork **dựng cả phim** bằng thư viện style
+[lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) (Caption News, Broadcast News Package, Data Storytelling…).
+Đẹp hơn nhiều nhưng mỗi phim mất 30–60 phút và tốn nhiều token, nên chỉ dùng cho tin quan trọng.
+
+1. Supabase **SQL Editor** → dán `supabase/migrations/002_premium_films.sql` → **Run**.
+2. Trong terminal của máy chạy Cowork, cài skill:
+   ```bash
+   claude plugin marketplace add lemomo-ai/lemo-opuscar
+   claude plugin install lemo-opuscar@lemolab
+   ```
+   Cần Node 20+, ffmpeg, Python 3.11+ (đã có sẵn cho worker).
+3. Trong Cowork tạo **tác vụ riêng** (chạy tay, hoặc định kỳ vào giờ máy rảnh), thư mục làm việc `App-Video`, nội dung:
+   > Đọc file COWORK-FILM.md trong thư mục này và làm theo.
+
+Dùng: **Tin hot → ★ Phim cao cấp** (chọn style hoặc để Cowork chọn), tick ★ khi dán link, hoặc
+**Video → Làm thành phim cao cấp**. Phim hiện "Chờ dựng phim" → "Đang dựng phim" → "Chờ duyệt", duyệt và đăng như video thường.
+
 ---
 
 ## Lệnh hữu ích (trong `auto-video-gen/`)
@@ -100,6 +119,7 @@ Có thể chạy tay bất cứ lúc nào khi thấy video "Chờ kịch bản".
 | `npm run worker` | Chạy worker |
 | `npm run worker -- restore ../backups/backup-xxx.zip` | Khôi phục dữ liệu từ bản sao lưu |
 | `npm run cowork -- pending` | Xem video chờ kịch bản |
+| `npm run cowork -- films` | Xem phim cao cấp chờ dựng |
 | `npm run news:find` | Thử tìm tin hot (in ra màn hình, không ghi DB) |
 | `npm test` | Chạy test |
 | `npm run audio:make` | Tạo lại nhạc nền + hiệu ứng âm thanh (tự tạo khi render lần đầu) |

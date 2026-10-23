@@ -29,6 +29,20 @@ export async function getDurationSec(path: string): Promise<number> {
   return d;
 }
 
+/** Width/height of the first video stream. */
+export async function getVideoSize(path: string): Promise<{ width: number; height: number }> {
+  const out = await run("ffprobe", [
+    "-v", "error",
+    "-select_streams", "v:0",
+    "-show_entries", "stream=width,height",
+    "-of", "csv=p=0:s=x",
+    path,
+  ]);
+  const [width, height] = out.trim().split("x").map((n) => parseInt(n, 10));
+  if (!width || !height) throw new Error(`ffprobe found no video stream in ${path}: ${out}`);
+  return { width, height };
+}
+
 /**
  * Concatenate audio files with `gapSec` silence between each, producing a single
  * output mp3.

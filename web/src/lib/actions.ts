@@ -5,18 +5,34 @@ export async function enqueue(channelId: string | null, type: JobType, payload: 
   must(await supabase.from("jobs").insert({ channel_id: channelId, type, payload }));
 }
 
-export async function createVideoFromStory(story: Story) {
+/** `film` set = premium film made by Cowork with lemo-opuscar; `film.style` null = Cowork picks the style. */
+export interface FilmChoice {
+  style: string | null;
+}
+
+const kindFields = (film?: FilmChoice) =>
+  film ? { kind: "premium", film_style: film.style } : { kind: "standard", film_style: null };
+
+export async function createVideoFromStory(story: Story, film?: FilmChoice) {
   must(await supabase.from("stories").update({ status: "selected" }).eq("id", story.id));
   must(
     await supabase.from("videos").insert({
       channel_id: story.channel_id, story_id: story.id, source_url: story.url, title: story.title, status: "waiting_script",
+      ...kindFields(film),
     }),
   );
 }
 
-export async function createVideoFromUrl(channelId: string, url: string) {
+export async function createVideoFromUrl(channelId: string, url: string, film?: FilmChoice) {
   if (!/^https?:\/\//.test(url)) throw new Error("URL phải bắt đầu bằng http:// hoặc https://");
-  must(await supabase.from("videos").insert({ channel_id: channelId, source_url: url, title: url, status: "waiting_script" }));
+  must(await supabase.from("videos").insert({
+    channel_id: channelId, source_url: url, title: url, status: "waiting_script", ...kindFields(film),
+  }));
+}
+
+/** Turn an existing video into a premium film; Cowork picks it up with `npm run cowork -- films`. */
+export async function makePremiumFilm(video: Video, film: FilmChoice) {
+  must(await supabase.from("videos").update({ ...kindFields(film), status: "waiting_script", error: null }).eq("id", video.id));
 }
 
 export async function skipStory(story: Story) {
@@ -43,12 +59,13 @@ export async function rejectVideo(video: Video) {
 }
 
 export async function rerenderVideo(video: Video) {
-  if (!video.script) throw new Error("Video chưa có kịch bản — chờ Cowork viết");
+  // A premium film is re-finalized from the file Cowork submitted
+  if (video.kind === "premium" ? !video.local_dir : !video.script) throw new Error("Video chưa có kịch bản — chờ Cowork viết");
   must(await supabase.from("videos").update({ status: "script_ready", error: null }).eq("id", video.id));
   await enqueue(video.channel_id, "render", { videoId: video.id });
 }
 
-/** Send back to Cowork to rewrite the script. */
+/** Send back to Cowork to rewrite the script (or remake the film, for a premium video). */
 export async function rewriteScript(video: Video) {
   must(await supabase.from("videos").update({ status: "waiting_script", error: null }).eq("id", video.id));
 }
